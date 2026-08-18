@@ -1,0 +1,49 @@
+name: 学習ノートの修正報告（AIP-C01 サービス別ノート）
+description: terralien.net/learn/aip-c01/ の解説に、間違い・古い記述・わかりにくい箇所を見つけたときに使う
+title: "[learn/aip-c01] "
+labels:
+  - learn:aip-c01
+body:
+  - type: markdown
+    attributes:
+      value: |
+        [AIP-C01 サービス別ノート](https://terralien.net/learn/aip-c01/) への指摘窓口です。
+        ノート本体は別の場所で管理していますが、**指摘はここで受けて、直したら報告します**。
+
+        ページの「GitHub で報告する」ボタンから来た場合、URL は埋まっています。
+        AWS のサービス仕様は変わります。**古くなっている**という指摘も歓迎します。
+  - type: input
+    id: page
+    attributes:
+      label: 対象ページ
+      description: どのノートか（URL）
+      placeholder: https://terralien.net/learn/aip-c01/amazon-bedrock/
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: 種類
+      options:
+        - 事実の誤り（仕様・数値・挙動が違う）
+        - 情報が古い（当時は正しかったが現在は違う）
+        - 出典が切れている / 出典と本文が食い違う
+        - わかりにくい・説明が足りない
+        - 誤字・表記
+        - その他
+    validations:
+      required: true
+  - type: textarea
+    id: detail
+    attributes:
+      label: 内容
+      description: 該当箇所と、どう違うか。**AWS 公式ドキュメントの URL があると一番早く直せます**（このノートは公式ドキュメントだけを出典にしています）
+      placeholder: |
+        「〜」と書かれているが、公式では〜。
+        https://docs.aws.amazon.com/...
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        ありがとうございます。直したらこの Issue で報告します。
