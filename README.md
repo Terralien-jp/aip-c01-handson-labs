@@ -4,7 +4,7 @@ AWS Certified Generative AI Developer – Professional（AIP-C01）対策の**�
 問題集や座学で「解ける」けど「触ったことない」を潰すことに特化し、試験ドメインの中でも
 **設定値の挙動レベルで問われる深いゾーン**（チャンク戦略・Guardrails設定・推論パラメータ・評価）に絞って構成しています。
 
-- 2026年7月時点のAWS公式ドキュメントで裏取り済み
+- 2026年7月時点のAWS公式ドキュメントで裏取り済み（LAB4のBedrock Agents Classicの扱いは2026年8月に再確認・更新）
 - 全ラボに**費用目安と片付け手順**付き（合計6〜7時間・$10未満で完走可能）
 - 手順は「GUIで概念を掴む → CLI/コードで再現」の二段構成
 
@@ -19,14 +19,21 @@ AWS Certified Generative AI Developer – Professional（AIP-C01）対策の**�
 | 1 | [推論パラメータとPrompt Caching](LAB1-inference-params.md) | D1/D4 | 60分 | 〜$1 |
 | 2 | [Knowledge Base とチャンク戦略](LAB2-knowledge-base.md) | D1(31%) | 90分 | 〜$3 ⚠️片付け厳守 |
 | 3 | [Guardrails 全機能](LAB3-guardrails.md) | D3(20%) | 60分 | 〜$1 |
-| 4 | [Agents / Action Group](LAB4-agents.md) ⏰**2026-07-29までに着手推奨** | D2(26%) | 90分 | 〜$1 |
+| 4 | [Agents / Action Group](LAB4-agents.md) ⚠️**アカウントにより実行可否が分かれる（下記）** | D2(26%) | 90分 | 〜$1 |
 | 5 | [評価とオブザーバビリティ](LAB5-evaluation.md) | D5(11%)+D4 | 60分 | 〜$3 |
 
-## ⏰ 期限あり: LAB4 は 2026-07-29 までに一度やる
+## ⚠️ LAB4 の前提が変わりました（2026-07-30 以降）
 
-Bedrock Agents（Classic）は **2026-07-30 以降、過去12か月に利用実績のないアカウントでは
-新規 CreateAgent がブロック**されます（maintenance mode）。アカウントで未使用なら、
-7/29までにLAB4を1回実施しておくと以後も使い続けられます。間に合わない場合はAgentCoreで代替を。
+**Amazon Bedrock Agents（Classic）は 2026年7月30日にメンテナンスモードへ入り、新規顧客への提供を終了しました。**
+以降、**過去12か月に Bedrock Agents の利用実績がないアカウント**では `CreateAgent` と `InvokeInlineAgent` が
+`AccessDeniedException`（HTTP 403）になります。**例外申請の窓口はありません**（AWSが利用実績で自動判定します）。
+
+- **利用実績のあるアカウント**: 影響なし。LAB4 をそのまま実施できます
+- **実績のないアカウント**: LAB4 の Classic 手順は実行できません。**[LAB4 付録の AgentCore 版](LAB4-agents.md#付録-agentcore-で同じことをやる新規アカウント向け)** に進んでください
+- 既存エージェントの運用（`UpdateAgent` / `InvokeAgent` / `PrepareAgent` / 各種 Get・List・Delete）は**全アカウントで引き続き利用可能**。移行期限も end-of-life の予定日も公表されていません
+- ただし **Classic のモデルカタログは 2026年7月30日で凍結**され、以降の新モデルは AgentCore 側にのみ来ます。新規開発の推奨先は **Amazon Bedrock AgentCore** です
+
+出典: [Amazon Bedrock Agents Classic maintenance mode](https://docs.aws.amazon.com/bedrock/latest/userguide/agents-classic-maintenance-mode.html)（AWS公式）
 
 ## ⚠️ コスト地雷トップ3（先に知っておく）
 

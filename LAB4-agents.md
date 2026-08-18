@@ -6,6 +6,31 @@
 
 想定所要時間: 90分　想定費用: 〜$1（Bedrockモデル呼び出し数回分＋Lambda無料枠内）
 
+## ⚠️ 最初に: このラボが自分のアカウントで実行できるか確かめる
+
+**Amazon Bedrock Agents（Classic）は 2026年7月30日にメンテナンスモードへ入り、新規顧客への提供を終了した。**
+判定はアカウント単位で、AWS が「過去12か月に Bedrock Agents の利用実績があるか」で自動的に許可リストを決めている。**例外申請の窓口はない。**
+
+| 自分のアカウント | このラボ |
+|---|---|
+| 過去12か月に Bedrock Agents の利用実績が**ある** | **Part A から通常どおり実施できる** |
+| 実績が**ない**（多くの学習用アカウントはこちら） | Classic 手順は実行不可。**[付録: AgentCore で同じことをやる](#付録-agentcore-で同じことをやる新規アカウント向け)** へ進む |
+
+**事前に可否だけを調べるAPIは無い。** `ListAgents` などの参照系は全アカウントで通るので、通っても許可リストの証明にはならない。
+実際の可否は Part A の `CreateAgent`（コンソールの「エージェントを作成」でも同じ）で分かる。許可リスト外なら、次のエラーで弾かれる。
+
+```
+An error occurred (AccessDeniedException) when calling the CreateAgent operation:
+Bedrock Agents is in Maintenance Mode. New agent creation is not available for
+accounts without prior service usage.
+```
+
+これが出たら、Part A 以降は飛ばして付録へ。
+
+> **試験対策としてどちらが要るか。** AIP-C01 の試験ガイド In-Scope に単独で載っているのは **Bedrock AgentCore** であって Bedrock Agents ではない。
+> ただし出題論点としては Classic 側の語彙（Action Group・trace・Return of Control・`PrepareAgent`）が今も問われうるので、
+> **手を動かせない場合でも Part A〜C の「確認ポイント」は読んでおく**こと。実機で触る対象は付録の AgentCore に寄せてよい。
+
 ## 前提条件
 
 - 個人AWSアカウント、リージョンは **us-east-1**
@@ -15,13 +40,27 @@
 
 ## 確認ポイント（コラム）: Bedrock Agents Classic と AgentCore の住み分け
 
-本ラボで扱う「Bedrock Agents」は、2026年7月時点で **Amazon Bedrock Agents Classic** と呼ばれている（2023年11月ローンチの元祖Bedrock Agentsが改称されたもの）。AWS公式ドキュメントには以下の記載がある。
+本ラボで扱う「Bedrock Agents」は、2023年11月ローンチの元祖 Bedrock Agents が改称された **Amazon Bedrock Agents Classic** である。AWS公式ドキュメントには以下の記載がある。
 
 > Amazon Bedrock Agents (launched November 2023) is now Amazon Bedrock Agents Classic and will no longer be open to new customers starting on July 30, 2026.
 
-つまり **2026/7/30以降、過去12か月にBedrock Agents利用実績のないアカウントでは新規の `CreateAgent` がAccessDeniedExceptionになる**（既存の利用実績があるアカウントは影響なし）。`UpdateAgent` / `InvokeAgent` / 各種GetAPIなど既存エージェントの運用に必要なAPIは引き続き全アカウントで利用可能。新規開発の推奨移行先は **Amazon Bedrock AgentCore**（Runtime / Memory / Gateway / Identity 等のモジュール群からなる、フレームワーク非依存のエージェント基盤）。
+**2026年7月30日にこれは発効した。** 以降、過去12か月に Bedrock Agents 利用実績のないアカウントでは `CreateAgent` と `InvokeInlineAgent` が `AccessDeniedException`（HTTP 403）になる。一方、`UpdateAgent` / `InvokeAgent` / `PrepareAgent` / 各種 Get・List・Delete など**既存エージェントの運用に必要なAPIは全アカウントで引き続き利用可能**で、既存エージェントが止まることはない。
 
-本ラボは試験範囲であるAgents Classicの構成要素（Action Group・trace・InvokeAgent）を体感するのが目的なので、このまま従来型で進める。既に自分のアカウントでBedrock Agentsを使った実績があれば影響なく進められるはずだが、**アカウントが新規で7/30以降に本ラボを行う場合はCreateAgentがブロックされる可能性がある**点は覚えておく（試験にも「Classic は新規受付終了、AgentCoreへの移行が推奨」という論点で出うる）。
+公式ドキュメントで確認できる現況を整理すると、次のとおり。
+
+| 論点 | 公式の記述 |
+|---|---|
+| 既存エージェントの停止 | **しない。** 通常どおり動作し、運用系APIも全アカウントで利用可能 |
+| 制限されるAPI | **`CreateAgent` と `InvokeInlineAgent` のみ**（実績のないアカウントに限る） |
+| 例外申請 | **なし。** 許可リストは過去12か月の利用実績からAWSが自動判定する |
+| 移行期限 / EOL | **どちらも設定されていない。** Classic は既存顧客向けに維持される |
+| 新機能・新モデル | **追加されない。** モデルカタログは 2026年7月30日時点で凍結され、以降の新モデルは AgentCore 側のみ |
+| 名称変更の影響 | **なし。** API名前空間（`bedrock-agent`）・SDKクライアント・CloudFormation リソース型・IAM アクション接頭辞はすべて不変 |
+| 料金 | Classic 自体への課金は元々なし。背後のモデル推論と関連リソースの課金のみ（変更なし） |
+
+新規開発の推奨移行先は **Amazon Bedrock AgentCore**。公式は2つの経路を挙げている——設定ファイルでモデル・ツール・指示を宣言する **managed harness**（Classic のマネージド体験に最も近い）と、任意のフレームワーク（Strands / LangChain / OpenAI Agents SDK / Claude Agent SDK 等）を AgentCore Runtime に載せる **code-defined agents**。既存の Classic 設定を取り込む import 経路も AgentCore CLI にある。
+
+本ラボは試験範囲である Classic の構成要素（Action Group・trace・InvokeAgent）を体感するのが目的なので、**許可リスト内のアカウントではこのまま従来型で進める**。そうでない場合は付録の AgentCore 版へ。
 
 ## Part A: エージェント作成とAction Group（コンソール操作）
 
@@ -273,7 +312,9 @@ response = client.invoke_agent(
 - [ ] `sessionId`を複数回の`invoke_agent`呼び出しで使い回すことで会話の文脈が継続する。`sessionState`で`sessionAttributes`/`promptSessionAttributes`を渡し、Lambda側の`event`として受け取れる
 - [ ] `enableTrace=True`にすると、レスポンスのイベントストリームに`trace`オブジェクトが混在して返る。trace種別は**PreProcessingTrace / OrchestrationTrace / PostProcessingTrace / FailureTrace / GuardrailTrace**などがあり、OrchestrationTraceには`Rationale`（推論）・`InvocationInput`（呼び出し内容）・`Observation`（結果）が含まれる
 - [ ] **AWS CLIには`bedrock-agent-runtime invoke-agent`コマンドが存在しない**（2026年7月時点）。エージェント呼び出しはboto3などのSDK経由で行う
-- [ ] **Amazon Bedrock Agents（Classic）は2026年7月30日以降、新規顧客（過去12か月に利用実績のないアカウント）向けの`CreateAgent`を受け付けなくなる**。既存の利用実績があるアカウントおよび既存エージェントの運用（Update/Invoke等）には影響なし。新規開発は**Amazon Bedrock AgentCore**への移行が推奨されている
+- [ ] **Amazon Bedrock Agents（Classic）は2026年7月30日にメンテナンスモードへ入り、新規顧客への提供を終了した**。制限されるのは`CreateAgent`と`InvokeInlineAgent`だけで、対象は過去12か月に利用実績のないアカウント（`AccessDeniedException` / HTTP 403）。例外申請の窓口はない
+- [ ] **既存エージェントは止まらない**。`UpdateAgent` / `InvokeAgent` / `PrepareAgent` / Get・List・Delete 系は全アカウントで利用可能。移行期限もEOL予定日も設定されていない。ただし**モデルカタログは2026年7月30日で凍結**され、新モデルは**Amazon Bedrock AgentCore**側にのみ追加される
+- [ ] AgentCore への移行経路は2つ。設定で宣言する **managed harness**（Classic のマネージド体験に最も近い）と、任意フレームワークを載せる **code-defined agents**。Classic の Action Group は **AgentCore Gateway 経由の MCP ツール**に、Return of Control は **inline function ツール**に対応する
 
 ## 片付け
 
@@ -306,3 +347,114 @@ response = client.invoke_agent(
 - Lambda: 呼び出し回数が数回〜十数回程度なら無料枠内
 - エージェント自体・Action Group自体に固定費用はなし（Bedrock Agentsの利用そのものへの追加課金はなく、背後のモデル呼び出し分のみ課金される）
 - 合計で **$1未満** に収まる想定
+
+
+---
+
+## 付録: AgentCore で同じことをやる（新規アカウント向け）
+
+Bedrock Agents Classic を作れないアカウント向けの代替経路。**「エージェントにツールを持たせ、ツール呼び出しの様子をトレースで追う」というLAB4の狙いはそのまま**で、土台を AgentCore の managed harness に置き換える。
+
+> **本付録の裏取りについて。** 手順・コマンドは [AgentCore CLI 入門](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agentcore-get-started-cli.html)・[harness 入門](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-get-started.html)・[harness のツール](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-tools.html) の記述に沿って構成している。
+> **ラボ本体（Part A〜C）と違い、通しでの実機確認は行っていない。** 画面やCLIの挙動が違っていたら Issue で知らせてほしい。
+
+### 用語の対応表（Classic → AgentCore）
+
+| Bedrock Agents Classic | AgentCore での相当物 |
+|---|---|
+| マネージドなオーケストレーションループ | harness が標準で提供 |
+| Action Group（OpenAPI/関数スキーマ＋Lambda実行体） | **AgentCore Gateway** が REST API や Lambda を MCP ツールとして公開 |
+| Return of Control（クライアント側で実行） | **inline function ツール**（harness が停止し `tool_use` をクライアントへ返す） |
+| Knowledge Base をエージェント設定に紐づけ | Gateway 経由の KB 連携、またはコード側の retrieval ツール |
+| trace UI / trace API | AgentCore observability（全アクションの永続トレース） |
+| `AMAZON.CodeInterpreter` | AgentCore Code Interpreter ツール |
+| セッション・メモリ設定 | AgentCore Memory（短期・長期、戦略を選択） |
+| ステージ別のプロンプトオーバーライド | **直接の相当物なし**（system prompt ＋自前スクリプトで近似する） |
+| マルチエージェント協調のルーティング | **限定的**（agent-as-tool は可能。ルーティング型は自前コードが要る） |
+
+出典: [Amazon Bedrock Agents Classic maintenance mode](https://docs.aws.amazon.com/bedrock/latest/userguide/agents-classic-maintenance-mode.html)
+
+**この表の右2行が試験でも実務でも効く。** 「Classic からの移行で何が失われるか」を問われたら、**ステージ別プロンプトオーバーライドとルーティング型マルチエージェント**が答えの中心になる。
+
+### 前提条件
+
+- **Node.js 20 以降**（AgentCore CLI は npm パッケージ）。`node --version` で確認
+- **Python 3.10 以降**（エージェントコードを書く場合）
+- AWS 認証情報が設定済みで、**AgentCore がサポートするリージョン**であること（[対応リージョン一覧](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agentcore-regions.html)を先に確認する。ラボ本体の us-east-1 と同じとは限らない）
+- AgentCore API を呼ぶ権限と、デプロイ時に CDK bootstrap ロールを assume できる IAM 権限（[必要な権限](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/security-iam.html)）
+
+### 手順
+
+**1. CLI をインストール**
+
+```bash
+npm install -g @aws/agentcore
+agentcore --version
+```
+
+**2. harness プロジェクトを作る**
+
+```bash
+agentcore create
+```
+
+対話ウィザードで、プロジェクト種別に **Harness**（設定ベースのマネージドループ。フレームワークのコードを書かない）を選ぶ。モデルプロバイダ・メモリ・環境を順に選択して確定する。非対話で作るなら次のとおり。
+
+```bash
+agentcore create --name weatherlab --model-provider bedrock
+```
+
+**3. ツールを1つ持たせる（Part A の Lambda に相当）**
+
+LAB4 の Lambda は「都市名を受けてダミー天気を返すだけ」だった。AgentCore では、**同じことを Lambda もIAMロールも作らずに** inline function ツールで再現できる。ツールの実体はクライアント側（手元）で動き、harness は呼び出しを打ち返してくる——**Classic の Return of Control と同じ形**である。
+
+```bash
+agentcore add tool --harness weatherlab --type inline_function \
+  --name get_weather \
+  --description "Get the current weather for a city." \
+  --input-schema '{"type": "object", "properties": {"city": {"type": "string"}}, "required": ["city"]}'
+```
+
+> **Lambda を本当に繋ぎたい場合**は inline function ではなく **AgentCore Gateway** を立て、Lambda をターゲットに登録して MCP ツールとして公開し、`agentcore add tool --type agentcore_gateway --gateway-arn <ARN>` で harness に取り付ける。これが Action Group の正統な移行先だが、Gateway の作成手順は本付録の範囲外なので [Gateway のドキュメント](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway.html)を見ること。
+
+**4. ローカルで動かす（任意）**
+
+```bash
+agentcore dev
+```
+
+依存をインストールしてローカルサーバを起動し、ブラウザで **agent inspector** が開く。チャットしながらトレースをその場で見られる。**Part C で trace を読んだのと同じ観察が、ここで一番安く済む。**
+
+**5. デプロイして呼ぶ**
+
+```bash
+agentcore deploy
+agentcore invoke --harness weatherlab \
+  --session-id "$(uuidgen)" \
+  "東京の天気は？"
+```
+
+初回デプロイは CDK の bootstrap が走るので数分かかる。**同じ `--session-id` を使い回すと会話が継続する**——Classic の `sessionId` と同じ考え方（ただし `runtimeSessionId` は33文字以上が要求されるので UUID を使う）。
+
+エージェントが `get_weather` を呼ぶと、非対話モードでは `stopReason: "tool_use"` で戻ってくる。手元で結果を作り、続けて invoke に載せて返すとオーケストレーションが再開する。**この往復こそが Return of Control の実物**なので、一度は手で回しておく。
+
+**6. トレースとログを見る（Part C 相当）**
+
+```bash
+agentcore logs --since 30m
+agentcore traces list
+agentcore traces get <trace-id>
+```
+
+**7. 片付け（必ずやる）**
+
+```bash
+agentcore remove all
+agentcore deploy
+```
+
+`remove all` は設定を空にするだけ。**続けて `agentcore deploy` を打って初めてアカウント上のリソースが削除される。** ここを忘れると課金が続くので、`agentcore status` で残骸がないことまで確認する。
+
+### 費用について
+
+**Classic と違い、AgentCore は従量課金の対象が増える。** harness そのものへの追加課金はないが、runtime・memory・gateway といった各機能の消費に応じて課金される。ラボ規模（数回の invoke と即日削除）なら少額に収まる想定だが、**本ラボ集の「〜$1」は Classic 手順の見積もりであって、AgentCore 版で検証した数字ではない**。実施前に [AgentCore の料金ページ](https://aws.amazon.com/bedrock/agentcore/pricing/)を必ず見て、LAB0 の予算アラートを効かせた状態で始めること。
